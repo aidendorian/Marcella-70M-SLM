@@ -13,7 +13,7 @@ class TransformerBlock(Module):
         self.norm1 = LayerNorm(D_MODEL)
         self.attn = Attention(dropout)
         self.norm2 = LayerNorm(D_MODEL)
-        self.ffn = FFN(dropout)
+        self.ffn = FeedForwardNetwork(dropout)
         
     def forward(self, x, kv_cache=None):
         attn_out = self.attn(self.norm1(x), kv_cache)
@@ -22,17 +22,17 @@ class TransformerBlock(Module):
         x = x + ffn_out
         return x
     
-class FFN(Module):
+class FeedForwardNetwork(Module):
     def __init__(self, dropout = 0.1):
         super().__init__()
         hidden_dim = 4 * D_MODEL
-        self.fc1 = Linear(D_MODEL, hidden_dim, bias=False)
+        self.layer1 = Linear(D_MODEL, hidden_dim, bias=False)
         self.act= GELU()
-        self.fc2 = Linear(hidden_dim,D_MODEL,bias=False)
+        self.layer2 = Linear(hidden_dim, D_MODEL, bias=False)
         self.dropout = Dropout(dropout)
 
     def forward(self, x):
-        x = self.fc1(x)
+        x = self.layer1(x)
         x = self.act(x)
-        x = self.fc2(x)
+        x = self.layer2(x)
         return self.dropout(x)
