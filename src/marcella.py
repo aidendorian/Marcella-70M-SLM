@@ -19,7 +19,7 @@ class TransformerBlock(Module):
     def forward(self, x, kv_cache=None):
         attn_out = self.attn(self.norm1(x), kv_cache)
         x = x + attn_out
-        ffn_out = self.ffn(self.norm2(x), kv_cache)
+        ffn_out = self.ffn(self.norm2(x))
         x = x + ffn_out
         return x
     
