@@ -2,6 +2,7 @@ import torch
 from torch.nn import LayerNorm, GELU, Module, Linear, Dropout
 from torch.optim import AdamW
 from src.attention import Attention
+
 N_HEADS = 12
 D_MODEL = 384
 VOCAB = 32000
