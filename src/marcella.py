@@ -1,20 +1,23 @@
 import torch
-from torch.nn import LayerNorm, GELU, Module, Linear, Dropout
+from torch.nn import LayerNorm, GELU, Module, Linear, Dropout, Embedding
 from torch.optim import AdamW
 from src.attention import Attention
 
-N_HEADS = 12
-D_MODEL = 384
-VOCAB = 32000
-ATTN_DROPOUT = 0.1
-
 class TransformerBlock(Module):
-    def __init__(self, dropout=0.1):
+    def __init__(self,
+                 embed_dim:int,
+                 num_heads:int,
+                 ffn_dropout:float,
+                 attn_dropout:float):
         super().__init__()
-        self.norm1 = LayerNorm(D_MODEL)
-        self.attn = Attention(dropout)
-        self.norm2 = LayerNorm(D_MODEL)
-        self.ffn = FeedForwardNetwork(dropout)
+        
+        self.norm1 = LayerNorm(embed_dim)
+        self.attn = Attention(embed_dim=embed_dim,
+                              num_heads=num_heads,
+                              flash_attn_dropout=attn_dropout)
+        self.norm2 = LayerNorm(embed_dim)
+        self.ffn = FeedForwardNetwork(embed_dim=embed_dim,
+                                      dropout=ffn_dropout)
         
     def forward(self, x, kv_cache=None):
         attn_out = self.attn(self.norm1(x), kv_cache)
@@ -24,12 +27,14 @@ class TransformerBlock(Module):
         return x
     
 class FeedForwardNetwork(Module):
-    def __init__(self, dropout = 0.1):
+    def __init__(self,
+                 embed_dim,
+                 dropout):
         super().__init__()
-        hidden_dim = 4 * D_MODEL
-        self.layer1 = Linear(D_MODEL, hidden_dim, bias=False)
+
+        self.layer1 = Linear(embed_dim, 4 * embed_dim, bias=False)
         self.act= GELU()
-        self.layer2 = Linear(hidden_dim, D_MODEL, bias=False)
+        self.layer2 = Linear(4 * embed_dim, embed_dim, bias=False)
         self.dropout = Dropout(dropout)
 
     def forward(self, x):
@@ -37,3 +42,16 @@ class FeedForwardNetwork(Module):
         x = self.act(x)
         x = self.layer2(x)
         return self.dropout(x)
+    
+class Marcella(Module):
+    def __init__(self,
+                 vocab_size:int=32000,
+                 embed_dim:int=768,
+                 num_transformer_layers:int=32,
+                 num_heads:int=12,
+                 attn_dropout:float=0.0,
+                 ):
+        super().__init__()
+        
+        self.token_embed = Embedding(vocab_size, embed_dim)
+        self.lm_head = Embedding(embed_dim, vocab_size)
