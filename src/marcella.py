@@ -1,5 +1,6 @@
-from torch.nn import LayerNorm, GELU, Module, Linear, Dropout, Embedding, ModuleList
+from torch.nn import LayerNorm, GELU, Module, Linear, Dropout, ModuleList
 from src.attention import Attention
+from bitsandbytes.nn.modules import StableEmbedding
 
 class TransformerBlock(Module):
     def __init__(self,
@@ -53,7 +54,7 @@ class Marcella(Module):
         
         super().__init__()
         
-        self.token_embed = Embedding(vocab_size, embed_dim)
+        self.token_embed = StableEmbedding(vocab_size, embed_dim)
         self.lm_head = Linear(embed_dim, vocab_size, bias=False)
         self.transformer_blocks = ModuleList([
             TransformerBlock(embed_dim=embed_dim,
