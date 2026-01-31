@@ -10,7 +10,7 @@ class Config:
         self.dataset_split = 'train'
         self.tkn_model = 'models/Marcella_vocab_32K.model'
         self.block_size = 512
-        self.batch_size = 2
+        self.batch_size = 4
         self.num_workers = 4
         self.pin_memory = True
         self.prefetch_factor = 2
