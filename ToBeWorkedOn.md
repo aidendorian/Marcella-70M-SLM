@@ -17,3 +17,4 @@
 * Attention still uses manual matmul path when kv\_cache is present → much slower decode, higher memory vs SDPA
 * *Dropout in attention is 0.0 → might benefit from small attn dropout (0.05–0.1) for regularization*
 * ***max\_samples=None → potentially trains forever on huge dataset without defined stopping point***
+* **use register_buffer for kv_cache storage**
