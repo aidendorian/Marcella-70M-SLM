@@ -58,7 +58,7 @@ class KV_Cache:
                  max_seq_len=config.max_seq_len,
                  head_dim=config.embed_dim//config.num_heads):
         
-        self.k = torch.zeros(batch_size, num_heads, max_seq_len, head_dim, device=config.device, dtype=torch.bfloat16)
+        self.k = torch.zeros(batch_size, num_heads, max_seq_len, head_dim, device=None, dtype=torch.bfloat16)
         self.v = torch.zeros_like(self.k)
         self.cache_len = 0
         self.max_seq_len = max_seq_len
@@ -113,7 +113,7 @@ class Attention(Module):
         
         sin, cos = precompute_freqs_cis(embed_dim//num_heads,
                                         max_seq_len=config.max_seq_len,
-                                        device=config.device)
+                                        device=None)
         
         self.register_buffer("rope_sin", sin, persistent=False)
         self.register_buffer("rope_cos", cos, persistent=False)
@@ -126,12 +126,10 @@ class Attention(Module):
         q = q.view(B, S, self.num_heads, self.d_head).transpose(1, 2)
         k = k.view(B, S, self.num_heads, self.d_head).transpose(1, 2)
         v = v.view(B, S, self.num_heads, self.d_head).transpose(1, 2)
-        
-        assert self.rope is torch.tensor
-        
+                
         if kv_cache is None:
-            q = apply_rope(q, self.rope_sin[:S], self.rope_cos[:S]) # type: ignore
-            k = apply_rope(k, self.rope_sin[:S], self.rope_cos[:S]) # type: ignore
+            q = apply_rope(q, self.rope_sin, self.rope_cos) # type: ignore
+            k = apply_rope(k, self.rope_sin, self.rope_cos) # type: ignore
             
             out = scaled_dot_product_attention(
             q, k, v,

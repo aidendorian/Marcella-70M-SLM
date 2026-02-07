@@ -1,6 +1,7 @@
 from torch.nn import LayerNorm, GELU, Module, Linear, Dropout, ModuleList
-from src.attention import Attention
+from src.attention import Attention, KV_Cache
 from bitsandbytes.nn.modules import StableEmbedding
+import torch
 
 class TransformerBlock(Module):
     def __init__(self,
@@ -19,8 +20,8 @@ class TransformerBlock(Module):
         self.ffn = FeedForwardNetwork(embed_dim=embed_dim,
                                       dropout=ffn_dropout)
         
-    def forward(self, x, kv_cache=None, freqs_cis=None):
-        attn_out = self.attn(self.norm1(x), kv_cache, freqs_cis)
+    def forward(self, x, kv_cache=None):
+        attn_out = self.attn(self.norm1(x), kv_cache)
         x = x + attn_out
         ffn_out = self.ffn(self.norm2(x))
         x = x + ffn_out
@@ -65,15 +66,41 @@ class Marcella(Module):
             for _ in range(num_transformer_layers)
         ])
         self.norm = LayerNorm(embed_dim)
+        self.num_heads = num_heads
+        self.head_dim = embed_dim//num_heads
         
-    def forward(self, input_ids, kv_cache=None, freqs_cis=None):
+    def init_kv_cache(self,
+                      batch_size: int,
+                      max_seq_len: int,
+                      device=torch.device('cuda'),
+                      dtype=torch.bfloat16):
+
+        caches = []
+
+        for _ in self.transformer_blocks:
+
+            cache = KV_Cache(batch_size=batch_size,
+                             num_heads=self.num_heads,
+                             max_seq_len=max_seq_len,
+                             head_dim=self.head_dim)
+            
+            if device is not None:
+                cache.k = cache.k.to(device)
+                cache.v = cache.v.to(device)
+            if dtype is not None:
+                cache.k = cache.k.to(dtype)
+                cache.v = cache.v.to(dtype)
+            caches.append(cache)
+        return caches
+        
+    def forward(self, input_ids, kv_cache=None):
         x = self.token_embed(input_ids)
 
         if kv_cache is None:
             kv_cache = [None] * len(self.transformer_blocks)
 
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, kv_cache[i], freqs_cis)
+            x = block(x, kv_cache[i])
 
         x = self.norm(x)
         logits = self.lm_head(x)
