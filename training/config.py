@@ -3,8 +3,8 @@ import torch
 class Config:
     def __init__(self):
         self.vocab_size = 32000
-        self.embed_dim = 384
-        self.num_transformer_layers = 32
+        self.embed_dim = 576
+        self.num_transformer_layers = 12
         self.num_heads = 12
         self.attn_dropout = 0.05
         self.ffn_dropout = 0.1
