@@ -18,7 +18,7 @@ class Config:
         self.prefetch_factor = 2
         self.persistent_workers = True
         self.max_samples = None
-        self.validation_prompt = 'It takes a special amount of patience to handle it, special care and especially some very accurate love. Yet you toss it out with such insignificance, it may not be important to you - but it is my heart.'
+        self.validation_prompt = 'I have no idea what you are doing and that makes two of us'
         self.device = torch.device('cuda')
         self.max_seq_len = 512
         self.accumulation_steps = 6
