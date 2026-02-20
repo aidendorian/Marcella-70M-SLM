@@ -17,7 +17,7 @@ config = Config()
 device = config.device
 print(f'Device: {device}')
 
-model = Marcella(vocab_size=config.vocab_size, 
+model = Marcella(vocab_size=config.vocab_size,
                  embed_dim=config.embed_dim,
                  num_transformer_layers=config.num_transformer_layers,
                  num_heads=config.num_heads,
@@ -86,11 +86,10 @@ if RESUME_FROM_CHECKPOINT:
     _, model, optimizer, start_iter = load_checkpoint(model, optimizer, checkpoint_path)
     print(f'Resuming Training from Iter: {start_iter} from {checkpoint_path}')
 
-MAX_ITERS = 7500 + start_iter
+MAX_ITERS = 300 + start_iter
 print(f'Starting Training from iter {start_iter}, to {MAX_ITERS}')
 
 loss = 0.
-steps = 0
 
 for i, (x, y) in enumerate(tqdm(data, desc='Training', total=MAX_ITERS)):
     if start_iter > i:
@@ -98,22 +97,21 @@ for i, (x, y) in enumerate(tqdm(data, desc='Training', total=MAX_ITERS)):
     
     model.train()
     
-    optimizer.zero_grad()
     x, y = x.to(device), y.to(device)
     with autocast(device_type=device.type, dtype=torch.bfloat16):
         logits = model(x)
         B, T, C = logits.shape
         logits = logits.view(B*T, C)
-        loss += loss_fn(logits, y.view(B*T))
-    steps+=1
+        loss = loss_fn(logits, y.view(B*T))
+    loss /= config.accumulation_steps
+    loss.backward()
 
-    if steps==config.accumulation_steps:
-        steps = 0
-        loss = loss/config.accumulation_steps
-        loss.backward()
+    if i+1%config.accumulation_steps:
         optimizer.step()
+        optimizer.zero_grad()
     
     if i==MAX_ITERS-1:
-        with open('vaildation.txt', 'a') as file:
+        with open('training/vaildation.txt', 'a') as file:
             file.write(validate(model, config.validation_prompt, max_tokens=256, top_k=10)+'\n----------------------------\n')
-        save_checkpoint(model, optimizer, 'training/checkpoints', f'{i+1}_marcella.pth', loss, i+1)
+        save_checkpoint(model, optimizer, 'training/checkpoints', f'{i+1}_chkpnt.pth', loss, i+1)
+        break
