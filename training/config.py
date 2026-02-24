@@ -12,13 +12,13 @@ class Config:
         self.dataset_split = 'train'
         self.tkn_model = 'models/Marcella_vocab_32K.model'
         self.block_size = 512
-        self.batch_size = 4
+        self.batch_size = 6
         self.num_workers = 4
         self.pin_memory = True
         self.prefetch_factor = 2
         self.persistent_workers = True
         self.max_samples = None
-        self.validation_prompt = 'I have no idea what you are doing and that makes two of us'
+        self.validation_prompt = "The Moon has this magical creature on it's surface called"
         self.device = torch.device('cuda')
         self.max_seq_len = 1024
         self.accumulation_steps = 6
