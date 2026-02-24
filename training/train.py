@@ -11,6 +11,10 @@ from src.tokenizer import Tokenizer
 from src.attention import KV_Cache
 from training.checkpoint import load_checkpoint, save_checkpoint
 
+torch.backends.cuda.enable_flash_sdp(True)
+torch.backends.cuda.enable_mem_efficient_sdp(False)
+torch.backends.cuda.enable_math_sdp(False)
+
 os.makedirs('training/checkpoints', exist_ok=True)
 
 config = Config()
@@ -77,8 +81,8 @@ def validate(model, val_prompt, max_tokens, top_k):
             
     return tkn.decode(generated[0].tolist())
 
-RESUME_FROM_CHECKPOINT = False
-checkpoint_path = ''
+RESUME_FROM_CHECKPOINT = True
+checkpoint_path = 'training/checkpoints/88500_chkpnt.pth'
 
 start_iter = 0
 
@@ -86,7 +90,7 @@ if RESUME_FROM_CHECKPOINT:
     _, model, optimizer, start_iter = load_checkpoint(model, optimizer, checkpoint_path)
     print(f'Resuming Training from Iter: {start_iter} from {checkpoint_path}')
 
-MAX_ITERS = 300 + start_iter
+MAX_ITERS = 15000 + start_iter
 print(f'Starting Training from iter {start_iter} to {MAX_ITERS}')
 
 for i, (x, y) in enumerate(tqdm(data, desc='Training', total=MAX_ITERS)):
