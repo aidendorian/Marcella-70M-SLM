@@ -3,7 +3,7 @@ from typing import List
 
 class Tokenizer:
     def __init__(self,
-                 tokenizer_model:str='models/Marcella_vocab_32K.model'):
+                 tokenizer_model:str='models/Marcella_vocab_32K_v2.model'):
         
         super().__init__()
         
