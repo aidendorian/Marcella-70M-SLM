@@ -1,94 +1,76 @@
-from datasets import load_dataset
-from torch.utils.data import IterableDataset, DataLoader
+import os
+import numpy as np
 import torch
-from src.tokenizer import Tokenizer
+from torch.utils.data import IterableDataset, DataLoader
 
-class TextData(IterableDataset):
-    def __init__(self, dataset, tokenizer, block_size, max_samples=None, skip_chunks=0):
+class ShardedDataset(IterableDataset):
+    def __init__(self, data_dir, block_size, start_shard=0, start_seq=0):
         super().__init__()
-        self.dataset = dataset
-        self.tokenizer = tokenizer
+        self.data_dir = data_dir
         self.block_size = block_size
-        self.max_samples = max_samples
-        self.skip_chunks = skip_chunks
+        self.start_shard = start_shard
+        self.start_seq = start_seq
         self.chunks_yielded = 0
+        self.current_shard = start_shard
+        self.current_seq = 0
+
+    def _get_shards(self):
+        return sorted([
+            f for f in os.listdir(self.data_dir)
+            if f.endswith('.bin')
+        ])
 
     def __iter__(self):
-        buffer = []
-        sample_count = 0
-        chunks_skipped = 0
+        shards = self._get_shards()
 
-        for ex in self.dataset:
-            if self.max_samples and sample_count >= self.max_samples:
-                break
+        for shard_idx, shard_file in enumerate(shards):
+            if shard_idx < self.start_shard:
+                continue
 
-            text = ' '.join(ex['text']).replace(' \n', '').replace('\n', '')
-            ids = self.tokenizer.encode(text)
-            ids.append(self.tokenizer.eos_id)
-            buffer.extend(ids)
+            bin_path = os.path.join(self.data_dir, shard_file)
+            idx_path = bin_path.replace('.bin', '.idx')
 
-            while len(buffer) >= self.block_size + 1:
-                chunk = buffer[:self.block_size + 1]
-                buffer = buffer[self.block_size + 1:]
+            data    = np.fromfile(bin_path, dtype=np.uint16)
+            offsets = np.fromfile(idx_path, dtype=np.int64)
 
-                if chunks_skipped < self.skip_chunks:
-                    chunks_skipped += 1
+            seq_start = self.start_seq if shard_idx == self.start_shard else 0
+
+            for seq_i in range(seq_start, len(offsets)):
+                offset = offsets[seq_i]
+                chunk  = data[offset: offset + self.block_size + 1]
+
+                if len(chunk) < self.block_size + 1:
                     continue
 
-                x = torch.tensor(chunk[:-1])
-                y = torch.tensor(chunk[1:])
+                x = torch.tensor(chunk[:-1].astype(np.int64))
+                y = torch.tensor(chunk[1:].astype(np.int64))
+
+                self.current_shard = shard_idx
+                self.current_seq   = seq_i
+                self.chunks_yielded += 1
+
                 yield x, y
 
-                self.chunks_yielded += 1
-                sample_count += 1
 
-                if self.max_samples and sample_count >= self.max_samples:
-                    return
-
-
-def get_data(dataset_name: str = "draco976/wikipedia-bookcorpus",
-             dataset_split: str = 'train',
-             tkn_model: str = 'models/Marcella_vocab_32K.model',
-             block_size: int = 512,
-             batch_size: int = 2,
+def get_data(data_dir: str,
+             block_size: int = 1024,
+             batch_size: int = 5,
              num_workers: int = 0,
-             pin_memory: bool = True,
-             prefetch_factor: int | None = None,
+             pin_memory: bool = False,
+             prefetch_factor=None,
              persistent_workers: bool = False,
-             max_samples=None,
-             resume_chunks: int = 0,
-             avg_tokens_per_row: int = 520):
+             start_shard: int = 0,
+             start_seq: int = 0):
 
-    dataset = load_dataset(
-        dataset_name,
-        split=dataset_split,
-        streaming=True
-    )
-
-    if resume_chunks > 0:
-        tokens_to_skip = resume_chunks * block_size
-        rows_to_skip = int(tokens_to_skip / avg_tokens_per_row)
-
-        safe_rows_to_skip = int(rows_to_skip * 0.98)
-        dataset = dataset.skip(safe_rows_to_skip)
-
-        tokens_covered_by_skip = safe_rows_to_skip * avg_tokens_per_row
-        chunks_covered_by_skip = int(tokens_covered_by_skip / block_size)
-        skip_chunks = resume_chunks - chunks_covered_by_skip
-    else:
-        skip_chunks = 0
-
-    tokenizer = Tokenizer(tokenizer_model=tkn_model)
-    text_data = TextData(
-        dataset=dataset,
-        tokenizer=tokenizer,
+    dataset = ShardedDataset(
+        data_dir=data_dir,
         block_size=block_size,
-        max_samples=max_samples,
-        skip_chunks=skip_chunks
+        start_shard=start_shard,
+        start_seq=start_seq
     )
 
     data = DataLoader(
-        text_data,
+        dataset,
         batch_size=batch_size,
         num_workers=num_workers,
         pin_memory=pin_memory,
@@ -96,4 +78,25 @@ def get_data(dataset_name: str = "draco976/wikipedia-bookcorpus",
         persistent_workers=persistent_workers
     )
 
-    return data, text_data
+    return data, dataset
+
+
+def get_val_batch(data_dir: str,
+                  block_size: int,
+                  batch_size: int,
+                  device):
+    
+    bin_path = os.path.join(data_dir, 'shard_00000.bin')
+    idx_path = os.path.join(data_dir, 'shard_00000.idx')
+
+    data    = np.fromfile(bin_path, dtype=np.uint16)
+    offsets = np.fromfile(idx_path, dtype=np.int64)
+
+    xs, ys = [], []
+    for b in range(batch_size):
+        offset = offsets[b]
+        chunk  = data[offset: offset + block_size + 1]
+        xs.append(torch.tensor(chunk[:-1].astype(np.int64)))
+        ys.append(torch.tensor(chunk[1:].astype(np.int64)))
+
+    return torch.stack(xs).to(device), torch.stack(ys).to(device)
