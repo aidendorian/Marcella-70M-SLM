@@ -1,1 +1,0 @@
-* ***No torch.backends.cudnn.benchmark = True → potential 5–20% throughput loss***
