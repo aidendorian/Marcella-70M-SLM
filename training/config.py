@@ -8,10 +8,10 @@ class Config:
         self.num_heads = 12
         self.attn_dropout = 0.05
         self.ffn_dropout = 0.1
-        self.data_dir='training/data'
+        self.data_dir = 'training/data'
         self.tkn_model = 'models/Marcella_vocab_32K_v2.model'
         self.block_size = 1024
-        self.batch_size = 5
+        self.batch_size = 4
         self.num_workers = 0
         self.pin_memory = False
         self.prefetch_factor = None
@@ -21,8 +21,8 @@ class Config:
         self.device = torch.device('cuda')
         self.max_seq_len = 1024
         self.accumulation_steps = 8
-        self.TOTAL_STEPS = 244_140
-        self.WARMUP_STEPS = 2_441
+        self.TOTAL_STEPS = 61_035
+        self.WARMUP_STEPS = 610
         self.T_MAX = self.TOTAL_STEPS - self.WARMUP_STEPS
         self.LR_MAX = 2e-4
         self.LR_MIN = 2e-5
