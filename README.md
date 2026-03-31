@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="dark.png" alt="Marcella Logo" width="120"/>
+  <img src="dark.png" alt="Marcella Logo" width="230"/>
 </p>
 
 
