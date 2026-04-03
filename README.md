@@ -156,7 +156,6 @@ A lightweight Svelte frontend with a FastAPI streaming backend. Tokens stream in
 
 **Start the backend:**
 ```bash
-uv add fastapi uvicorn
 uv run uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
@@ -169,7 +168,7 @@ npm run dev
 
 Then open `http://localhost:5173` in your browser.
 
-The sidebar exposes temperature, top-k, and max tokens controls — all applied per request. `Enter` sends a message, `Shift+Enter` adds a newline.
+The sidebar exposes temperature, top-k, and max tokens controls — all applied per request. `Enter` sends a message.
 
 ---
 
