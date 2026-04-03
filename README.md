@@ -150,6 +150,29 @@ Evaluated on a held-out tail split (shards 40+, 1,140 sequences):
 
 ---
 
+## Web UI
+
+A lightweight Svelte frontend with a FastAPI streaming backend. Tokens stream into the chat bubble in real time as the model generates them.
+
+**Start the backend:**
+```bash
+uv add fastapi uvicorn
+uv run uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+**Start the frontend** (in a separate terminal):
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173` in your browser.
+
+The sidebar exposes temperature, top-k, and max tokens controls — all applied per request. `Enter` sends a message, `Shift+Enter` adds a newline.
+
+---
+
 ## Project Structure
 
 ```
@@ -175,11 +198,11 @@ MARCELLA-60M/
 │   │   └── light.png
 │   ├── src/
 │   │   ├── App.svelte
-│   │   └── mian.js
+│   │   └── main.js
 │   ├── index.html
 │   ├── package.json
 │   └── vite.config.js
-├── app.py
+├── api.py
 ├── dark.png
 ├── light.png
 ├── pyproject.toml
