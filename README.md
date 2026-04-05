@@ -135,6 +135,37 @@ Checkpoints save model weights, optimizer state, scheduler state, PyTorch and CU
 
 ---
 
+## Finetuning
+
+Instruction finetuning on top of the pretrained weights using a masked language modelling objective — loss is only computed over the response tokens, not the instruction.
+
+```bash
+uv run python finetune.py
+```
+
+| Setting | Value |
+|---|---|
+| Optimizer | AdamW8bit (bitsandbytes) |
+| Max LR | per config |
+| LR schedule | Linear warmup → cosine decay |
+| Weight decay | 0.1 (non-bias/norm params) |
+| Gradient clipping | 1.0 |
+| dtype | bfloat16 |
+
+Prompts are formatted as:
+
+```
+### Instruction:
+{instruction}
+
+### Response:
+{response}
+```
+
+The instruction tokens are masked out (`loss_mask = False`) so the model only learns to generate responses. The API applies this same template automatically when the finetuned model is active — raw prompts sent to `/generate` are wrapped transparently.
+
+---
+
 ## Evaluation
 
 Evaluated on a held-out tail split (shards 40+, 1,140 sequences):
@@ -168,7 +199,7 @@ npm run dev
 
 Then open `http://localhost:5173` in your browser.
 
-The sidebar exposes temperature, top-k, and max tokens controls — all applied per request. `Enter` sends a message.
+The sidebar exposes temperature, top-k, and max tokens controls — all applied per request. You can switch between the pretrained and finetuned model at runtime without restarting the server. `Enter` sends a message.
 
 ---
 
@@ -179,18 +210,21 @@ MARCELLA-60M/
 ├── models/
 │   ├── Marcella_vocab_32K_v2.model   # SentencePiece model
 │   ├── Marcella_vocab_32K_v2.vocab
-│   └── marcella.pt                   # Model weights
+│   ├── marcella_finetuned.pt
+│   └── marcella_pretrained.pt
 ├── src/
 │   ├── attention.py      # RoPE, KV cache, multi-head attention
 │   ├── marcella.py       # TransformerBlock, FFN, Marcella model
 │   └── tokenizer.py      # SentencePiece wrapper
 ├── training/
 │   ├── checkpoints/
-│   ├── data/             # Pre-tokenized binary shards
-│   ├── checkpoint.py     # Save/load with full RNG state
-│   ├── config.py         # All hyperparameters
-│   ├── dataloader.py     # Sharded streaming dataset + resume
-│   ├── train.py          # Training loop
+│   ├── data/                     # Pre-tokenized binary shards
+│   ├── checkpoint.py             # Save/load with full RNG state
+│   ├── config.py                 # All hyperparameters
+│   ├── dataloader.py
+│   ├── finetune.py               # Intruction FineTuning
+│   ├── finetuning_dataloader.py  # Instruction dataset + loss masking
+│   ├── train.py                  # Training loop
 │   └── validation.txt
 ├── ui/
 │   ├── public/
