@@ -2,18 +2,21 @@
   import { tick } from 'svelte'
 
   // ── state ──────────────────────────────────────────────────────────────────
-  let messages = []        // { role: 'user'|'assistant', text: string }
+  let messages = []
   let input    = ''
   let loading  = false
   let error    = null
 
   // sidebar controls
-  let temperature = 0.8
-  let topK        = 50
-  let maxTokens   = 200
+  let temperature  = 0.8
+  let topK         = 50
+  let maxTokens    = 200
+  let activeModel  = 'pretrained'
+  let modelSwitching = false
+  let modelError   = null
 
-  let chatEl   // bound to the chat scroll container
-  let inputEl  // bound to the textarea
+  let chatEl
+  let inputEl
 
   // ── helpers ────────────────────────────────────────────────────────────────
   async function scrollToBottom() {
@@ -25,6 +28,42 @@
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       send()
+    }
+  }
+
+  // ── model switch ───────────────────────────────────────────────────────────
+  async function switchModel(model) {
+    if (model === activeModel || modelSwitching || loading) return
+    modelSwitching = true
+    modelError     = null
+
+    try {
+      const res = await fetch('/load_model', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+
+      // Always consume the body — on slow weight loads the stream must be
+      // fully read before we do anything else, otherwise the browser may
+      // report an unexpected end of JSON input even on a 200 response.
+      let data = {}
+      try {
+        data = await res.json()
+      } catch (_) {
+        // Body was empty or malformed; treat as a server error if !res.ok
+        if (!res.ok) throw new Error(`Server error ${res.status}`)
+      }
+
+      if (!res.ok) {
+        throw new Error(data.detail || `Server error ${res.status}`)
+      }
+
+      activeModel = model
+    } catch (err) {
+      modelError = err.message
+    } finally {
+      modelSwitching = false
     }
   }
 
@@ -55,9 +94,9 @@
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`)
 
-      const reader  = res.body.getReader()
-      const decoder = new TextDecoder()
-      let   buf     = ''
+      const reader   = res.body.getReader()
+      const decoder  = new TextDecoder()
+      let   buf      = ''
       let   finished = false
 
       while (!finished) {
@@ -66,7 +105,7 @@
 
         buf += decoder.decode(value, { stream: true })
         const lines = buf.split('\n')
-        buf = lines.pop()  // keep incomplete line
+        buf = lines.pop()
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
@@ -88,7 +127,7 @@
     } finally {
       loading = false
       await tick()
-      await tick()  // double tick ensures disabled=false is flushed before focus
+      await tick()
       inputEl?.focus()
     }
   }
@@ -106,6 +145,36 @@
   <aside class="sidebar">
     <div class="logo-block">
       <img src="/light.png" alt="Marcella" class="logo" onerror={(e) => e.currentTarget.style.display='none'} />
+    </div>
+
+    <!-- model selector -->
+    <div class="model-selector">
+      <span class="section-label">Model</span>
+      <div class="model-toggle">
+        <button
+          class="model-btn {activeModel === 'pretrained' ? 'active' : ''}"
+          onclick={() => switchModel('pretrained')}
+          disabled={modelSwitching || loading}
+        >
+          {#if modelSwitching && activeModel !== 'pretrained'}
+            <span class="dot-spin">·</span>
+          {/if}
+          Pretrained
+        </button>
+        <button
+          class="model-btn {activeModel === 'finetuned' ? 'active' : ''}"
+          onclick={() => switchModel('finetuned')}
+          disabled={modelSwitching || loading}
+        >
+          {#if modelSwitching && activeModel !== 'finetuned'}
+            <span class="dot-spin">·</span>
+          {/if}
+          Finetuned
+        </button>
+      </div>
+      {#if modelError}
+        <span class="model-err">⚠ {modelError}</span>
+      {/if}
     </div>
 
     <div class="controls">
@@ -140,7 +209,6 @@
   <!-- main area -->
   <main class="main">
 
-    <!-- chat messages -->
     <div class="chat" bind:this={chatEl}>
       {#if messages.length === 0}
         <div class="empty">
@@ -202,7 +270,6 @@
     font-family: 'DM Sans', sans-serif;
   }
 
-  /* ── layout ── */
   .shell {
     display: flex;
     height: 100vh;
@@ -234,6 +301,68 @@
     object-fit: contain;
   }
 
+  /* ── model selector ── */
+  .model-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .section-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #5a5550;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .model-toggle {
+    display: flex;
+    border: 1px solid #ddd8d0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .model-btn {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    color: #8a857e;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .model-btn:first-child { border-right: 1px solid #ddd8d0; }
+
+  .model-btn.active {
+    background: #1a1a1a;
+    color: #f5f3ef;
+  }
+
+  .model-btn:not(.active):hover:not(:disabled) {
+    background: #ede9e2;
+    color: #1a1a1a;
+  }
+
+  .model-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .model-err {
+    font-size: 0.75rem;
+    color: #c0392b;
+  }
+
+  .dot-spin {
+    animation: blink 0.6s step-end infinite;
+  }
+
+  /* ── controls ── */
   .controls {
     display: flex;
     flex-direction: column;
@@ -316,7 +445,6 @@
     background: #f5f3ef;
   }
 
-  /* ── chat area ── */
   .chat {
     flex: 1;
     overflow-y: auto;
@@ -331,7 +459,6 @@
   .chat::-webkit-scrollbar-track { background: transparent; }
   .chat::-webkit-scrollbar-thumb { background: #ddd8d0; border-radius: 4px; }
 
-  /* ── empty state ── */
   .empty {
     margin: auto;
     text-align: center;
@@ -385,7 +512,6 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
 
-  /* ── streaming cursor ── */
   .cursor-blink {
     display: inline-block;
     animation: blink 0.9s step-end infinite;
@@ -403,11 +529,7 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── error ── */
-  .error-row {
-    display: flex;
-    justify-content: center;
-  }
+  .error-row { display: flex; justify-content: center; }
   .error-msg {
     background: #fff0f0;
     border: 1px solid #f5c6c6;
@@ -469,10 +591,6 @@
   .send-btn:active:not(:disabled) { transform: scale(0.95); }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .spin {
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
