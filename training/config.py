@@ -26,3 +26,12 @@ class Config:
         self.T_MAX = self.TOTAL_STEPS - self.WARMUP_STEPS
         self.LR_MAX = 2e-4
         self.LR_MIN = 2e-5
+        
+        self.epochs_ft = 4
+        self.dataset_ft = "yahma/alpaca-cleaned"
+        self.batch_size_ft = 4
+        self.TOTAL_STEPS_ft = 3_250
+        self.WARMUP_STEPS_ft = 75
+        self.T_MAX_ft = self.TOTAL_STEPS_ft - self.WARMUP_STEPS_ft
+        self.LR_MAX_ft = 3e-5
+        self.LR_MIN_ft = 3e-6
